@@ -4,11 +4,13 @@
 #include "gps.h"
 #include "wifi.h"
 
-const int motorA1  = 9;    // Pin  5 of L293.
-const int motorA2  = 3;    // Pin  6 of L293.
-int eixo_X= 34;//A0; //PINO REFERENTE A LIGAÇÃO DO EIXO X
-int eixo_Y = 35;//A1; //PINO REFERENTE A LIGAÇÃO DO EIXO Y
-int botao = 2; //PINO REFERENTE A LIGAÇÃO NO PINO KEY (EIXO Z)
+//variáveis para caso de cadeiras com motor
+//const int motorA1  = 9;    // Pin  5 of L293.
+//const int motorA2  = 3;    // Pin  6 of L293.
+//int eixo_X= 34;//A0; //PINO REFERENTE A LIGAÇÃO DO EIXO X
+//int eixo_Y = 35;//A1; //PINO REFERENTE A LIGAÇÃO DO EIXO Y
+//int botao = 2; //PINO REFERENTE A LIGAÇÃO NO PINO KEY (EIXO Z)
+
 VL53L0X sensor;
 int i = 0;
 int j = 0;
@@ -17,8 +19,24 @@ char state;
 
 ADXL345 adxl; //variable adxl is an instance of the ADXL345 library
 
+int valor_ax_anterior;
+int valor_ay_anterior;
+int valor_az_anterior;
+int valor_ax_atual;
+int valor_ay_atual;
+int valor_az_atual;
+int diferenca_ax;
+int diferenca_ay;
+int diferenca_az;
+
+int velocidade;
+char velocidade_texto [10];
+
+char d;
+
 void setup() 
 {
+  Serial.begin(115200);
   setupGPS();
   wifi_connect();
   initMQTT();
@@ -72,25 +90,31 @@ void setup()
   
   pinMode (12, INPUT_PULLUP);
   digitalWrite (12, HIGH);
-  Serial.begin(9600);
-  Serial.print("Teste");
+
   Wire.begin();
   sensor.init();
   sensor.setTimeout(500);
   sensor.startContinuous();
   
-  pinMode (botao, INPUT_PULLUP);
+  //pinMode (botao, INPUT_PULLUP);
   
-  pinMode(motorA1, OUTPUT);
-  pinMode(motorA2, OUTPUT);
+  //pinMode(motorA1, OUTPUT);
+  //pinMode(motorA2, OUTPUT);
 }
 
 void loop() 
 {
+  //LIDAR
   int distance =sensor.readRangeContinuousMillimeters();
   Serial.print("Distance: ");
   Serial.print(distance);
   Serial.print("mm");
+
+  if (distance > 300)
+  {
+    Serial.print("Perigo de desnível - travamento de rodas");
+    mqtt.publish("/tcc/distancia", "Perigo de desnível - travamento de rodas");
+  }
 
   if (sensor.timeoutOccurred()) 
   { 
@@ -107,50 +131,50 @@ void loop()
    
   }
 
-  
-  if((analogRead(eixo_X)) == 0)
-  { 
-    Serial.println("PARA FRENTE");
-    digitalWrite(motorA1, 1);
-    digitalWrite(motorA2, 1);
-  }
 
-    if((analogRead(eixo_Y)) == 1023)
-   { 
-     Serial.println("ESQUERDA");
-     digitalWrite(motorA1, 1);
-     digitalWrite(motorA2, 0);
-  }
+  //if((analogRead(eixo_X)) == 0)
+  //{ 
+    //Serial.println("PARA FRENTE");
+    //digitalWrite(motorA1, 1);
+    //digitalWrite(motorA2, 1);
+  //}
 
-    if((analogRead(eixo_Y)) == 0)
-  { 
-    Serial.println("DIREITA"); 
-    digitalWrite(motorA1, 0);
-    digitalWrite(motorA2, 1);
-  }
+    //if((analogRead(eixo_Y)) == 1023)
+   //{ 
+     //Serial.println("ESQUERDA");
+     //digitalWrite(motorA1, 1);
+     //digitalWrite(motorA2, 0);
+  //}
 
-  if((analogRead(eixo_X)) == 1023)
- {
-    Serial.println("PARA TRAS");
-    digitalWrite(motorA1, 0);
-    digitalWrite(motorA2, 0);
+    //if((analogRead(eixo_Y)) == 0)
+  //{ 
+    //Serial.println("DIREITA"); 
+    //digitalWrite(motorA1, 0);
+    //digitalWrite(motorA2, 1);
+  //}
+
+  //if((analogRead(eixo_X)) == 1023)
+ //{
+    //Serial.println("PARA TRAS");
+    //digitalWrite(motorA1, 0);
+    //digitalWrite(motorA2, 0);
     
- }
+ //}
 
- if(digitalRead(botao) == LOW)
- { 
-   Serial.println("PARADO");
-   digitalWrite(motorA1, 0);
-   digitalWrite(motorA2, 0);
- }
+ //if(digitalRead(botao) == LOW)
+ //{ 
+   //Serial.println("PARADO");
+   //digitalWrite(motorA1, 0);
+   //digitalWrite(motorA2, 0);
+ //}
 
-Serial.print("eixo_X: ");
-Serial.println(analogRead(eixo_X));
+//Serial.print("eixo_X: ");
+//Serial.println(analogRead(eixo_X));
 
-Serial.print("eixo_Y: ");
-Serial.println(analogRead(eixo_Y));
+//Serial.print("eixo_Y: ");
+//Serial.println(analogRead(eixo_Y));
 
-//Boring accelerometer stuff   
+//accelerometro
  int x,y,z;  
   adxl.readXYZ(&x, &y, &z); //read the accelerometer values and store them in variables  x,y,z
   // Output x,y,z values 
@@ -169,13 +193,43 @@ Serial.println(analogRead(eixo_Y));
   az = xyz[2];
   Serial.print("X=");
   Serial.print(ax);
-    Serial.println(" g");
+  Serial.println(" g");
   Serial.print("Y=");
   Serial.print(ay);
-    Serial.println(" g");
+  Serial.println(" g");
   Serial.print("Z=");
   Serial.print(az);
-    Serial.println(" g");
+  Serial.println(" g");
   Serial.println("**********************");
+
+  valor_ax_anterior = valor_ax_atual;
+  valor_ax_atual = ax;
+  diferenca_ax = valor_ax_atual - valor_ax_anterior;
+  if (diferenca_ax > 100)
+  {
+    mqtt.publish("/tcc/acelerometro_x", "possível colisão");
+  }
+
+  valor_ay_anterior = valor_ay_atual;
+  valor_ay_atual = ay;
+  diferenca_ay = valor_ay_atual - valor_ay_anterior;
+  if (diferenca_ay > 100)
+  {
+    mqtt.publish("/tcc/acelerometro_y", "possível colisão");
+  }
+
+  valor_az_anterior = valor_az_atual;
+  valor_az_atual = az;
+  diferenca_az = valor_az_atual - valor_az_anterior;
+  if (diferenca_az > 100)
+  {
+    mqtt.publish("/tcc/acelerometro_z", "possível colisão");
+  }
+
+  //gps
+  velocidade = gps.speed.value();
+  sprintf(velocidade_texto, "%d", velocidade);
+  mqtt.publish("/tcc/velocidade_gps", velocidade_texto);
+  
 delay(1000);  
 }
