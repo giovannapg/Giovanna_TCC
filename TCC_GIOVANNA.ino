@@ -30,7 +30,7 @@ int diferenca_ay;
 int diferenca_az;
 
 int velocidade;
-char velocidade_texto [10];
+char velocidade_texto [32];
 
 char d;
 
@@ -106,22 +106,24 @@ void loop()
 {
   //LIDAR
   int distance =sensor.readRangeContinuousMillimeters();
-  Serial.print("Distance: ");
-  Serial.print(distance);
-  Serial.print("mm");
+  //Serial.print("Distance: ");
+  //Serial.print(distance);
+  //Serial.println("mm");
 
-  if (distance > 300)
+  if (distance > 150)
   {
-    Serial.print("Perigo de desnível - travamento de rodas");
+    //Serial.println("Perigo de desnível - travamento de rodas");
     mqtt.publish("/tcc/distancia", "Perigo de desnível - travamento de rodas");
   }
 
+  //Serial.println("**********************");
+
   if (sensor.timeoutOccurred()) 
   { 
-    Serial.print(" TIMEOUT"); 
+    //Serial.print(" TIMEOUT"); 
   }
 
-  Serial.println();
+  //Serial.println();
 
 
   if (Serial.available() > 0) 
@@ -177,13 +179,13 @@ void loop()
 //accelerometro
  int x,y,z;  
   adxl.readXYZ(&x, &y, &z); //read the accelerometer values and store them in variables  x,y,z
-  // Output x,y,z values 
-  Serial.print("values of X , Y , Z: ");
-  Serial.print(x);
-  Serial.print(" , ");
-  Serial.print(y);
-  Serial.print(" , ");
-  Serial.println(z);
+  //Output x,y,z values 
+  //Serial.print("values of X , Y , Z: ");
+  //Serial.print(x);
+  //Serial.print(" , ");
+  //Serial.print(y);
+  //Serial.print(" , ");
+  //Serial.println(z);
   
   double xyz[3];
   double ax,ay,az;
@@ -191,45 +193,68 @@ void loop()
   ax = xyz[0];
   ay = xyz[1];
   az = xyz[2];
-  Serial.print("X=");
-  Serial.print(ax);
-  Serial.println(" g");
-  Serial.print("Y=");
-  Serial.print(ay);
-  Serial.println(" g");
-  Serial.print("Z=");
-  Serial.print(az);
-  Serial.println(" g");
-  Serial.println("**********************");
+  //Serial.print("X=");
+  //Serial.print(ax);
+  //Serial.println(" g");
+  //Serial.print("Y=");
+  //Serial.print(ay);
+  //Serial.println(" g");
+  //Serial.print("Z=");
+  //Serial.print(az);
+  //Serial.println(" g");
+  //Serial.println("**********************");
 
   valor_ax_anterior = valor_ax_atual;
-  valor_ax_atual = ax;
+  valor_ax_atual = x;
   diferenca_ax = valor_ax_atual - valor_ax_anterior;
-  if (diferenca_ax > 100)
+  //Serial.print ("diferenca_ax=");
+  //Serial.println (diferenca_ax);
+  
+  if (diferenca_ax > 150 || diferenca_ax < -150)
   {
     mqtt.publish("/tcc/acelerometro_x", "possível colisão");
+    //Serial.println ("possível colisão");
   }
 
   valor_ay_anterior = valor_ay_atual;
-  valor_ay_atual = ay;
+  valor_ay_atual = y;
   diferenca_ay = valor_ay_atual - valor_ay_anterior;
-  if (diferenca_ay > 100)
+  //Serial.print ("diferenca_ay=");
+  //Serial.println (diferenca_ay);
+   
+  if (diferenca_ay > 150 || diferenca_ay < -150)
   {
     mqtt.publish("/tcc/acelerometro_y", "possível colisão");
+    //Serial.println ("possível colisão");
   }
 
   valor_az_anterior = valor_az_atual;
-  valor_az_atual = az;
+  valor_az_atual = z;
   diferenca_az = valor_az_atual - valor_az_anterior;
-  if (diferenca_az > 100)
+  //Serial.print ("diferenca_az=");
+  //Serial.println (diferenca_az);
+  
+  if (diferenca_az > 150 || diferenca_az < -150)
   {
     mqtt.publish("/tcc/acelerometro_z", "possível colisão");
+    //Serial.println ("possível colisão");
   }
 
   //gps
+  displayInfo();
+  
   velocidade = gps.speed.value();
   sprintf(velocidade_texto, "%d", velocidade);
+  Serial.println (velocidade);
+  Serial.println (velocidade_texto);
+  //Serial.println("*******");
   mqtt.publish("/tcc/velocidade_gps", velocidade_texto);
+   if (velocidade > 10)
+  {
+    mqtt.publish("/tcc/velocidade_gps1", "diminuir velocidade");
+    Serial.println (" diminuir velocidade");
+  }
   
 delay(1000);  
+mqtt.loop();
 }
